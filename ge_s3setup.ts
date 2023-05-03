@@ -1,8 +1,8 @@
 Parameters:
   BucketName:
     Type: String
-    Description: Name of the S3 bucket
-  RoleName:
+    Description: Name of the existing S3 bucket to modify
+  BucketRoleName:
     Type: String
     Description: Name of the IAM role for the S3 bucket
     Default: S3BucketAccessRole
@@ -10,21 +10,31 @@ Parameters:
     Type: String
     Description: Environment name
     Default: dev
+  HtmlRange:
+    Type: String
+    Description: IP range for users who can view HTML documents
+    Default: 0.0.0.0/0
 
 Resources:
-  MyS3Bucket:
-    Type: 'AWS::S3::Bucket'
+  MyS3BucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
     Properties:
-      BucketName: !Ref BucketName
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: CloudFormation
-  MyS3Role:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref BucketName, '/datadocs/*']]
+            Condition:
+              IpAddress:
+                aws:SourceIp: !Ref HtmlRange
+
+  MyS3BucketRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Ref RoleName
+      RoleName: !Ref BucketRoleName
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -33,19 +43,16 @@ Resources:
               Service: s3.amazonaws.com
             Action: 'sts:AssumeRole'
       Policies:
-        - PolicyName: S3AccessPolicy
+        - PolicyName: S3BucketAccessPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - 's3:GetObject'
                   - 's3:PutObject'
+                  - 's3:GetObject'
                   - 's3:DeleteObject'
-                  - 's3:ListBucket'
-                  - 's3:PutBucketVersioning'
                 Resource:
-                  - !Join ['', ['arn:aws:s3:::', !Ref BucketName]]
                   - !Join ['', ['arn:aws:s3:::', !Ref BucketName, '/*']]
       Tags:
         - Key: Environment
